@@ -1,30 +1,37 @@
 import './style.css'
-import { PDFDocument } from 'pdf-lib'
 
-// Load PDF.js from CDN at runtime
+// ===== LOAD EXTERNAL SCRIPTS =====
+function loadScript(src) {
+  if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = resolve
+    s.onerror = () => reject(new Error(`Failed to load ${src}`))
+    document.head.appendChild(s)
+  })
+}
+
 async function getPdfjsLib() {
   if (window._pdfjsLib) return window._pdfjsLib
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-    script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-      window._pdfjsLib = window.pdfjsLib
-      resolve(window._pdfjsLib)
-    }
-    script.onerror = reject
-    document.head.appendChild(script)
-  })
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  window._pdfjsLib = window.pdfjsLib
+  return window._pdfjsLib
+}
+
+async function getJsPDF() {
+  if (window.jspdf) return window.jspdf.jsPDF
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  return window.jspdf.jsPDF
 }
 
 // ===== ROUTER =====
 const routes = ['home', 'about', 'privacy', 'contact']
-let currentPage = 'home'
 
 function navigate(page) {
   if (!routes.includes(page)) page = 'home'
-  currentPage = page
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
   document.querySelectorAll('.nav-links a').forEach(a => {
     a.classList.toggle('active', a.dataset.page === page)
@@ -40,9 +47,10 @@ function routeFromHash() {
   navigate(routes.includes(hash) ? hash : 'home')
 }
 
+window.navigate = navigate
+
 // ===== STATE =====
 let selectedFile = null
-let unlockedBytes = null
 
 // ===== RENDER APP =====
 function renderApp() {
@@ -83,7 +91,7 @@ function renderApp() {
         <span class="shield-icon">🛡️</span>
         <div>
           <strong>Your file never leaves your device</strong><br>
-          <span>All processing happens in your browser using WebAssembly. Zero uploads.</span>
+          <span>All processing happens in your browser. Zero uploads.</span>
         </div>
       </div>
 
@@ -171,7 +179,7 @@ function renderApp() {
 
         <p>UnlockMyDoc was built because PDF passwords are annoying — especially when you're the rightful owner of the file and just need to print, share, or edit it. We built a tool that solves that in under 10 seconds, with zero privacy compromise.</p>
 
-        <p>Unlike other PDF tools that upload your files to a server, UnlockMyDoc processes everything directly in your browser using WebAssembly. Your document never touches our servers — because we don't have any file-processing servers.</p>
+        <p>Unlike other PDF tools that upload your files to a server, UnlockMyDoc processes everything directly in your browser. Your document never touches our servers — because we don't have any file-processing servers.</p>
 
         <div class="divider"></div>
         <h2>Why choose UnlockMyDoc?</h2>
@@ -180,7 +188,7 @@ function renderApp() {
           <div class="feature-item">
             <div class="feature-icon">🔒</div>
             <h4>100% Private</h4>
-            <p>Files are processed locally using pdf-lib in WebAssembly. Nothing is ever uploaded.</p>
+            <p>Files are processed locally in your browser. Nothing is ever uploaded.</p>
           </div>
           <div class="feature-item">
             <div class="feature-icon">⚡</div>
@@ -201,8 +209,7 @@ function renderApp() {
 
         <div class="divider"></div>
         <h2>Technology</h2>
-        <p>UnlockMyDoc uses <strong>pdf-lib</strong> and <strong>PDF.js</strong> to render your encrypted PDF page by page in the browser, then assembles a brand new encryption-free PDF. This happens entirely within the browser's JavaScript sandbox — no extensions, no plugins, no server.</p>
-
+        <p>UnlockMyDoc uses <strong>PDF.js</strong> (Mozilla's PDF engine) to decrypt and render your PDF page by page directly in the browser, then <strong>jsPDF</strong> assembles a brand new encryption-free PDF from those rendered pages. The output is a completely fresh PDF with zero encryption.</p>
         <p>The domain <strong>unlockmydoc.in</strong> is operated independently and is not affiliated with any PDF software vendor.</p>
       </div>
     </div>
@@ -214,17 +221,15 @@ function renderApp() {
         <p class="subtitle">Last updated: June 2025 &nbsp;·&nbsp; unlockmydoc.in</p>
 
         <h2>Our Core Promise</h2>
-        <p><strong>Your files are never uploaded to any server.</strong> All PDF processing on UnlockMyDoc happens entirely within your web browser using client-side JavaScript. When you select a PDF and enter a password, the decryption happens locally on your device. The resulting unlocked PDF is also created locally and downloaded directly to your device.</p>
-
+        <p><strong>Your files are never uploaded to any server.</strong> All PDF processing on UnlockMyDoc happens entirely within your web browser. When you select a PDF and enter a password, the decryption happens locally on your device. The resulting unlocked PDF is created locally and downloaded directly to your device.</p>
         <p>We have no file-processing servers. We cannot access your documents. We never see your PDF content, filenames, or passwords.</p>
 
         <div class="divider"></div>
         <h2>Information We Collect</h2>
-        <p>We collect minimal anonymous data to understand how the tool is used and to improve it:</p>
         <ul>
-          <li><strong>Analytics</strong>: We use Google Analytics to track page views, session duration, and general usage patterns. This data is anonymized and aggregated. No personal files or content are tracked.</li>
-          <li><strong>Cookies</strong>: Google Analytics sets cookies to distinguish unique visitors. No PDF content is stored in cookies.</li>
-          <li><strong>Advertising</strong>: We use Google AdSense to display advertisements. AdSense may use cookies for interest-based advertising. You can opt out via <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google's Ad Settings</a>.</li>
+          <li><strong>Analytics</strong>: We use Google Analytics to track page views and usage patterns. Data is anonymized. No file content is tracked.</li>
+          <li><strong>Cookies</strong>: Google Analytics sets cookies to distinguish unique visitors.</li>
+          <li><strong>Advertising</strong>: We use Google AdSense. AdSense may use cookies for interest-based advertising. Opt out via <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google's Ad Settings</a>.</li>
         </ul>
 
         <h2>What We Do NOT Collect</h2>
@@ -232,27 +237,16 @@ function renderApp() {
           <li>Your PDF files or their contents</li>
           <li>Passwords you enter into the tool</li>
           <li>Your name, email, or any personal identifiers</li>
-          <li>Any account information (we have no accounts)</li>
         </ul>
 
         <h2>Third-Party Services</h2>
-        <p>We use the following third-party services, each with their own privacy policies:</p>
         <ul>
           <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Analytics</a> — usage analytics</li>
           <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google AdSense</a> — advertising</li>
         </ul>
 
-        <h2>Data Security</h2>
-        <p>Because your files never leave your device, there is no risk of a data breach involving your PDF content. Our website is served over HTTPS to protect data in transit.</p>
-
-        <h2>Children's Privacy</h2>
-        <p>UnlockMyDoc is not directed at children under 13. We do not knowingly collect data from children.</p>
-
         <h2>Changes to This Policy</h2>
-        <p>We may update this privacy policy occasionally. The current version is always available at unlockmydoc.in/privacy. Continued use of the service constitutes acceptance of the updated policy.</p>
-
-        <h2>Contact</h2>
-        <p>Questions about this privacy policy? Email us at <a href="mailto:privacy@unlockmydoc.in">privacy@unlockmydoc.in</a>.</p>
+        <p>We may update this policy occasionally. Current version always at unlockmydoc.in. Questions? Email <a href="mailto:privacy@unlockmydoc.in">privacy@unlockmydoc.in</a>.</p>
       </div>
     </div>
 
@@ -265,32 +259,24 @@ function renderApp() {
         <div class="contact-cards">
           <div class="contact-card">
             <h3>💬 General Enquiries</h3>
-            <p>Questions, feedback, partnership ideas, or just want to say hi?</p>
+            <p>Questions, feedback, or partnership ideas.</p>
             <a href="mailto:hello@unlockmydoc.in">hello@unlockmydoc.in</a>
           </div>
           <div class="contact-card">
             <h3>🔒 Privacy & Data</h3>
-            <p>Data-related questions, GDPR requests, or privacy concerns.</p>
+            <p>GDPR requests or privacy concerns.</p>
             <a href="mailto:privacy@unlockmydoc.in">privacy@unlockmydoc.in</a>
           </div>
         </div>
 
-        <h2>Frequently Asked Questions</h2>
-
         <h2>Is my PDF safe?</h2>
-        <p>Yes. Your PDF is processed entirely in your browser. It never leaves your device and is never sent to any server. We physically cannot see your file.</p>
-
-        <h2>What types of PDF encryption does this support?</h2>
-        <p>UnlockMyDoc supports standard user-password protected PDFs using RC4 and AES encryption, which covers the vast majority of password-protected PDFs.</p>
-
-        <h2>Why doesn't it work on my PDF?</h2>
-        <p>Make sure you're entering the correct password. If you're sure the password is right and it still fails, feel free to email us.</p>
+        <p>Yes. Your PDF is processed entirely in your browser. It never leaves your device.</p>
 
         <h2>Do you store my password?</h2>
-        <p>Never. Passwords are used only in browser memory to decrypt your file and are discarded when you close the tab.</p>
+        <p>Never. Passwords are used only in browser memory and discarded when you close the tab.</p>
 
         <h2>Is this legal?</h2>
-        <p>UnlockMyDoc is intended for use on PDFs you have the legal right to access. Do not use this tool to circumvent access controls on documents you don't have authorization for.</p>
+        <p>UnlockMyDoc is intended for PDFs you have the legal right to access. Do not use this tool on documents you don't have authorization for.</p>
 
         <div class="divider"></div>
         <p>Response time is typically within 24–48 hours on business days.</p>
@@ -323,26 +309,19 @@ function bindEvents() {
   const togglePw = document.getElementById('toggle-pw')
   const unlockBtn = document.getElementById('btn-unlock')
 
-  dropZone.addEventListener('dragover', e => {
-    e.preventDefault()
-    dropZone.classList.add('dragover')
-  })
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover') })
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'))
   dropZone.addEventListener('drop', e => {
     e.preventDefault()
     dropZone.classList.remove('dragover')
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0])
   })
 
   fileInput.addEventListener('change', () => {
     if (fileInput.files[0]) handleFile(fileInput.files[0])
   })
 
-  removeBtn.addEventListener('click', e => {
-    e.stopPropagation()
-    clearFile()
-  })
+  removeBtn.addEventListener('click', e => { e.stopPropagation(); clearFile() })
 
   togglePw.addEventListener('click', () => {
     const inp = document.getElementById('pdf-password')
@@ -354,48 +333,34 @@ function bindEvents() {
   unlockBtn.addEventListener('click', doUnlock)
 }
 
-function triggerFileInput() {
-  document.getElementById('file-input').click()
-}
+function triggerFileInput() { document.getElementById('file-input').click() }
 window.triggerFileInput = triggerFileInput
-window.navigate = navigate
 
 function handleFile(file) {
   if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-    showStatus('error', '⚠️ Please select a PDF file.')
-    return
+    showStatus('error', '⚠️ Please select a PDF file.'); return
   }
   if (file.size > 52428800) {
-    showStatus('error', '⚠️ File too large. Maximum size is 50MB.')
-    return
+    showStatus('error', '⚠️ File too large. Maximum size is 50MB.'); return
   }
   selectedFile = file
-  unlockedBytes = null
-  hideDownload()
-  clearStatus()
-
+  hideDownload(); clearStatus()
   document.getElementById('file-info').classList.add('visible')
   document.getElementById('file-name').textContent = file.name
   document.getElementById('file-size').textContent = formatSize(file.size)
-
   updateUnlockBtn()
 }
 
 function clearFile() {
   selectedFile = null
-  unlockedBytes = null
   document.getElementById('file-info').classList.remove('visible')
   document.getElementById('file-input').value = ''
-  updateUnlockBtn()
-  clearStatus()
-  hideDownload()
-  hideProgress()
+  updateUnlockBtn(); clearStatus(); hideDownload(); hideProgress()
 }
 
 function updateUnlockBtn() {
   const pw = document.getElementById('pdf-password').value
-  const btn = document.getElementById('btn-unlock')
-  btn.disabled = !selectedFile || !pw.trim()
+  document.getElementById('btn-unlock').disabled = !selectedFile || !pw.trim()
 }
 
 function formatSize(bytes) {
@@ -407,105 +372,109 @@ function formatSize(bytes) {
 // ===== CORE UNLOCK LOGIC =====
 async function doUnlock() {
   if (!selectedFile) return
-
   const password = document.getElementById('pdf-password').value
   if (!password) return
 
   const btn = document.getElementById('btn-unlock')
   btn.disabled = true
   btn.innerHTML = `<div class="spinner"></div> Unlocking…`
-
-  clearStatus()
-  hideDownload()
-  showProgress('Reading file…', 10)
+  clearStatus(); hideDownload(); showProgress('Reading file…', 10)
 
   try {
     const arrayBuffer = await readFileAsArrayBuffer(selectedFile)
-    setProgress('Loading PDF.js…', 20)
+    setProgress('Loading libraries…', 15)
 
-    const pdfjsLib = await getPdfjsLib()
+    // Load PDF.js and jsPDF in parallel
+    const [pdfjsLib, jsPDF] = await Promise.all([getPdfjsLib(), getJsPDF()])
+    setProgress('Verifying password…', 25)
 
-    // Step 1: Open with PDF.js using password
-    let pdfJsDoc
+    // Step 1: Open with PDF.js — authoritative password check + decryption
+    let pdfDoc
     try {
-      const loadingTask = pdfjsLib.getDocument({
+      pdfDoc = await pdfjsLib.getDocument({
         data: new Uint8Array(arrayBuffer),
         password: password,
-      })
-      pdfJsDoc = await loadingTask.promise
+      }).promise
     } catch (err) {
-      const name = err.name || ''
-      const code = err.code
-      if (name === 'PasswordException' || code === 1 || code === 2) {
+      if (err.name === 'PasswordException' || err.code === 1 || err.code === 2) {
         throw new Error('WRONG_PASSWORD')
       }
       throw err
     }
 
-    const totalPages = pdfJsDoc.numPages
-    setProgress(`Rendering ${totalPages} page(s)…`, 35)
+    const totalPages = pdfDoc.numPages
+    setProgress(`Processing page 1 of ${totalPages}…`, 30)
 
-    // Step 2: Render every page to canvas, embed as image in new PDF
-    const newPdf = await PDFDocument.create()
+    // Step 2: Get first page size for jsPDF init
+    const firstPage = await pdfDoc.getPage(1)
+    const firstVp = firstPage.getViewport({ scale: 1.0 })
+    const pageW = firstVp.width
+    const pageH = firstVp.height
 
-    const SCALE = 2.0
+    // Step 3: Init jsPDF — this PDF has NO encryption by design
+    const pdf = new jsPDF({
+      orientation: pageW > pageH ? 'l' : 'p',
+      unit: 'pt',
+      format: [pageW, pageH],
+      compress: true,
+    })
+
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
+    const SCALE = 2.0
 
+    // Step 4: Render each page and add to new PDF
     for (let i = 1; i <= totalPages; i++) {
-      const page = await pdfJsDoc.getPage(i)
-      const viewport = page.getViewport({ scale: SCALE })
+      const page = await pdfDoc.getPage(i)
 
-      canvas.width = viewport.width
-      canvas.height = viewport.height
+      // Get this page's dimensions (pages can vary in size)
+      const vp1 = page.getViewport({ scale: 1.0 })
+      const vp2 = page.getViewport({ scale: SCALE })
+
+      canvas.width = Math.floor(vp2.width)
+      canvas.height = Math.floor(vp2.height)
 
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      await page.render({ canvasContext: ctx, viewport }).promise
+      await page.render({ canvasContext: ctx, viewport: vp2 }).promise
 
-      const imgDataUrl = canvas.toDataURL('image/jpeg', 0.92)
-      const imgBase64 = imgDataUrl.split(',')[1]
-      const imgBytes = Uint8Array.from(atob(imgBase64), c => c.charCodeAt(0))
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
 
-      const jpgImage = await newPdf.embedJpg(imgBytes)
+      if (i === 1) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, vp1.width, vp1.height, '', 'FAST')
+      } else {
+        pdf.addPage([vp1.width, vp1.height])
+        pdf.addImage(imgData, 'JPEG', 0, 0, vp1.width, vp1.height, '', 'FAST')
+      }
 
-      const w = viewport.width / SCALE
-      const h = viewport.height / SCALE
-      const newPage = newPdf.addPage([w, h])
-      newPage.drawImage(jpgImage, { x: 0, y: 0, width: w, height: h })
-
-      const pct = 35 + Math.round((i / totalPages) * 55)
+      const pct = 30 + Math.round((i / totalPages) * 62)
       setProgress(`Processing page ${i} of ${totalPages}…`, pct)
     }
 
-    pdfJsDoc.destroy()
+    pdfDoc.destroy()
     canvas.remove()
 
-    setProgress('Saving unlocked PDF…', 92)
+    setProgress('Saving…', 95)
 
-    const unlockedPdfBytes = await newPdf.save()
-    unlockedBytes = unlockedPdfBytes
-
-    const blob = new Blob([unlockedBytes], { type: 'application/pdf' })
+    // jsPDF output is always a fresh unencrypted PDF
+    const outBuffer = pdf.output('arraybuffer')
+    const blob = new Blob([outBuffer], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
-    const downloadLink = document.getElementById('btn-download')
-    downloadLink.href = url
-    const outName = selectedFile.name.replace(/\.pdf$/i, '') + '_unlocked.pdf'
-    downloadLink.download = outName
+
+    const dl = document.getElementById('btn-download')
+    dl.href = url
+    dl.download = selectedFile.name.replace(/\.pdf$/i, '') + '_unlocked.pdf'
 
     setProgress('Done!', 100)
-    showStatus('success', `✅ Unlocked ${totalPages} page(s) successfully! Click below to download.`)
+    showStatus('success', `✅ Unlocked ${totalPages} page(s)! Click below to download.`)
     showDownload()
 
   } catch (err) {
     hideProgress()
     console.error('Unlock error:', err)
-
-    if (err.message === 'WRONG_PASSWORD') {
+    if (err.message === 'WRONG_PASSWORD' || (err.message || '').toLowerCase().includes('password')) {
       showStatus('error', '❌ Wrong password. Please check and try again.')
-    } else if (err.message.includes('not encrypted') || err.message.includes('No password')) {
-      showStatus('error', '📄 This PDF doesn\'t appear to be password-protected.')
     } else {
       showStatus('error', `❌ Error: ${err.message}`)
     }
@@ -537,36 +506,22 @@ function showProgress(text, pct) {
   document.getElementById('progress-pct').textContent = pct + '%'
   document.getElementById('progress-fill').style.width = pct + '%'
 }
-
-function setProgress(text, pct) {
-  showProgress(text, pct)
-}
-
-function hideProgress() {
-  document.getElementById('progress-wrap').classList.remove('visible')
-}
+function setProgress(text, pct) { showProgress(text, pct) }
+function hideProgress() { document.getElementById('progress-wrap').classList.remove('visible') }
 
 function showStatus(type, msg) {
   const el = document.getElementById('status-msg')
   el.className = `status-msg ${type} visible`
   el.textContent = msg
 }
-
 function clearStatus() {
   const el = document.getElementById('status-msg')
   el.className = 'status-msg'
   el.textContent = ''
 }
+function showDownload() { document.getElementById('btn-download').classList.add('visible') }
+function hideDownload() { document.getElementById('btn-download').classList.remove('visible') }
 
-function showDownload() {
-  document.getElementById('btn-download').classList.add('visible')
-}
-
-function hideDownload() {
-  document.getElementById('btn-download').classList.remove('visible')
-}
-
-// ===== HANDLE POPSTATE =====
 window.addEventListener('popstate', routeFromHash)
 
 // ===== INIT =====
