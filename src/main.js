@@ -32,12 +32,9 @@ function navigate(page) {
   const el = document.getElementById(`page-${page}`)
   if (el) el.classList.add('active')
   window.scrollTo(0, 0)
-
-  // Update URL hash
   history.pushState({}, '', page === 'home' ? '/' : `#${page}`)
 }
 
-// Handle hash-based routing
 function routeFromHash() {
   const hash = location.hash.replace('#', '')
   navigate(routes.includes(hash) ? hash : 'home')
@@ -91,7 +88,6 @@ function renderApp() {
       </div>
 
       <div class="tool-card container">
-        <!-- Drop Zone -->
         <div class="drop-zone" id="drop-zone" onclick="triggerFileInput()">
           <div class="drop-icon">📄</div>
           <h3>Drop your PDF here</h3>
@@ -99,7 +95,6 @@ function renderApp() {
         </div>
         <input type="file" id="file-input" accept=".pdf,application/pdf" />
 
-        <!-- File Info -->
         <div class="file-info" id="file-info">
           <div class="file-icon">📑</div>
           <div class="file-details">
@@ -109,7 +104,6 @@ function renderApp() {
           <button class="remove-file" id="remove-file" title="Remove file">✕</button>
         </div>
 
-        <!-- Password Field -->
         <div class="field-group">
           <label class="field-label" for="pdf-password">PDF Password</label>
           <div class="field-wrap">
@@ -118,7 +112,6 @@ function renderApp() {
           </div>
         </div>
 
-        <!-- Unlock Button -->
         <button class="btn-unlock" id="btn-unlock" disabled>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -127,7 +120,6 @@ function renderApp() {
           Unlock PDF
         </button>
 
-        <!-- Progress -->
         <div class="progress-wrap" id="progress-wrap">
           <div class="progress-label">
             <span id="progress-text">Processing…</span>
@@ -138,10 +130,8 @@ function renderApp() {
           </div>
         </div>
 
-        <!-- Status -->
         <div class="status-msg" id="status-msg"></div>
 
-        <!-- Download -->
         <a class="btn-download" id="btn-download" href="#" download="unlocked.pdf">
           ⬇ Download Unlocked PDF
         </a>
@@ -211,7 +201,7 @@ function renderApp() {
 
         <div class="divider"></div>
         <h2>Technology</h2>
-        <p>UnlockMyDoc uses <strong>pdf-lib</strong>, a powerful open-source JavaScript library, to load your encrypted PDF using your password and then re-save it without any encryption. This happens entirely within the browser's JavaScript sandbox — no extensions, no plugins, no server.</p>
+        <p>UnlockMyDoc uses <strong>pdf-lib</strong> and <strong>PDF.js</strong> to render your encrypted PDF page by page in the browser, then assembles a brand new encryption-free PDF. This happens entirely within the browser's JavaScript sandbox — no extensions, no plugins, no server.</p>
 
         <p>The domain <strong>unlockmydoc.in</strong> is operated independently and is not affiliated with any PDF software vendor.</p>
       </div>
@@ -224,7 +214,7 @@ function renderApp() {
         <p class="subtitle">Last updated: June 2025 &nbsp;·&nbsp; unlockmydoc.in</p>
 
         <h2>Our Core Promise</h2>
-        <p><strong>Your files are never uploaded to any server.</strong> All PDF processing on UnlockMyDoc happens entirely within your web browser using client-side JavaScript (pdf-lib via WebAssembly). When you select a PDF and enter a password, the decryption happens locally on your device. The resulting unlocked PDF is also created locally and downloaded directly to your device.</p>
+        <p><strong>Your files are never uploaded to any server.</strong> All PDF processing on UnlockMyDoc happens entirely within your web browser using client-side JavaScript. When you select a PDF and enter a password, the decryption happens locally on your device. The resulting unlocked PDF is also created locally and downloaded directly to your device.</p>
 
         <p>We have no file-processing servers. We cannot access your documents. We never see your PDF content, filenames, or passwords.</p>
 
@@ -291,16 +281,16 @@ function renderApp() {
         <p>Yes. Your PDF is processed entirely in your browser. It never leaves your device and is never sent to any server. We physically cannot see your file.</p>
 
         <h2>What types of PDF encryption does this support?</h2>
-        <p>UnlockMyDoc supports standard user-password (open password) protected PDFs using RC4 and AES encryption, which covers the vast majority of password-protected PDFs. Owner-only restrictions (print/copy locks without an open password) may also be removed.</p>
+        <p>UnlockMyDoc supports standard user-password protected PDFs using RC4 and AES encryption, which covers the vast majority of password-protected PDFs.</p>
 
         <h2>Why doesn't it work on my PDF?</h2>
-        <p>Make sure you're entering the correct open password. Some very advanced or non-standard encryption schemes may not be supported. If you're sure the password is right and it still fails, feel free to email us.</p>
+        <p>Make sure you're entering the correct password. If you're sure the password is right and it still fails, feel free to email us.</p>
 
         <h2>Do you store my password?</h2>
         <p>Never. Passwords are used only in browser memory to decrypt your file and are discarded when you close the tab.</p>
 
         <h2>Is this legal?</h2>
-        <p>UnlockMyDoc is intended for use on PDFs you have the legal right to access. Unlocking your own documents, documents you've received legitimately, or documents whose passwords you've forgotten is generally legal. Do not use this tool to circumvent access controls on documents you don't have authorization for.</p>
+        <p>UnlockMyDoc is intended for use on PDFs you have the legal right to access. Do not use this tool to circumvent access controls on documents you don't have authorization for.</p>
 
         <div class="divider"></div>
         <p>Response time is typically within 24–48 hours on business days.</p>
@@ -333,7 +323,6 @@ function bindEvents() {
   const togglePw = document.getElementById('toggle-pw')
   const unlockBtn = document.getElementById('btn-unlock')
 
-  // Drag & drop
   dropZone.addEventListener('dragover', e => {
     e.preventDefault()
     dropZone.classList.add('dragover')
@@ -346,35 +335,28 @@ function bindEvents() {
     if (file) handleFile(file)
   })
 
-  // File input
   fileInput.addEventListener('change', () => {
     if (fileInput.files[0]) handleFile(fileInput.files[0])
   })
 
-  // Remove file
   removeBtn.addEventListener('click', e => {
     e.stopPropagation()
     clearFile()
   })
 
-  // Password toggle
   togglePw.addEventListener('click', () => {
     const inp = document.getElementById('pdf-password')
     inp.type = inp.type === 'password' ? 'text' : 'password'
     togglePw.textContent = inp.type === 'password' ? '👁' : '🙈'
   })
 
-  // Enable button when both file + password present
   passwordInput.addEventListener('input', updateUnlockBtn)
-
-  // Unlock
   unlockBtn.addEventListener('click', doUnlock)
 }
 
 function triggerFileInput() {
   document.getElementById('file-input').click()
 }
-// Expose to inline onclick
 window.triggerFileInput = triggerFileInput
 window.navigate = navigate
 
@@ -383,7 +365,7 @@ function handleFile(file) {
     showStatus('error', '⚠️ Please select a PDF file.')
     return
   }
-  if (file.size > 52428800) { // 50MB
+  if (file.size > 52428800) {
     showStatus('error', '⚠️ File too large. Maximum size is 50MB.')
     return
   }
@@ -392,7 +374,6 @@ function handleFile(file) {
   hideDownload()
   clearStatus()
 
-  // Update UI
   document.getElementById('file-info').classList.add('visible')
   document.getElementById('file-name').textContent = file.name
   document.getElementById('file-size').textContent = formatSize(file.size)
@@ -427,7 +408,6 @@ function formatSize(bytes) {
 async function doUnlock() {
   if (!selectedFile) return
 
-  // Don't trim password — spaces can be valid
   const password = document.getElementById('pdf-password').value
   if (!password) return
 
@@ -441,98 +421,70 @@ async function doUnlock() {
 
   try {
     const arrayBuffer = await readFileAsArrayBuffer(selectedFile)
-    setProgress('Verifying password…', 25)
+    setProgress('Loading PDF.js…', 20)
 
-    // ── Step 1: Use PDF.js to verify password & check encryption ──
-    // PDF.js has much broader encryption support than pdf-lib
     const pdfjsLib = await getPdfjsLib()
 
-    let isEncrypted = false
-    let passwordCorrect = false
-
+    // Step 1: Open with PDF.js using password
+    let pdfJsDoc
     try {
       const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer.slice(0), // slice to avoid detached buffer
+        data: new Uint8Array(arrayBuffer),
         password: password,
       })
-
-      const pdfJsDoc = await loadingTask.promise
-      await pdfJsDoc.getPage(1) // confirm it actually loaded
-      isEncrypted = true
-      passwordCorrect = true
-      pdfJsDoc.destroy()
-    } catch (pdfJsErr) {
-      const msg = pdfJsErr.message || ''
-      const name = pdfJsErr.name || ''
-
-      if (
-        name === 'PasswordException' ||
-        msg.includes('password') ||
-        msg.includes('Password') ||
-        (pdfJsErr.code !== undefined && pdfJsErr.code === 1) // NEED_PASSWORD
-      ) {
-        // PDF is encrypted but password is wrong
+      pdfJsDoc = await loadingTask.promise
+    } catch (err) {
+      const name = err.name || ''
+      const code = err.code
+      if (name === 'PasswordException' || code === 1 || code === 2) {
         throw new Error('WRONG_PASSWORD')
       }
-
-      if (msg.includes('No password') || msg.includes('not encrypted')) {
-        // Not encrypted — still try pdf-lib below
-        isEncrypted = false
-        passwordCorrect = false
-      }
-
-      // Any other error — still try pdf-lib as fallback
+      throw err
     }
 
-    setProgress('Decrypting…', 50)
+    const totalPages = pdfJsDoc.numPages
+    setProgress(`Rendering ${totalPages} page(s)…`, 35)
 
-    // ── Step 2: Use pdf-lib to load and re-save without encryption ──
-    let pdfDoc
-    try {
-      pdfDoc = await PDFDocument.load(arrayBuffer, {
-        password: password,
-        ignoreEncryption: false,
-        throwOnInvalidObject: false,
-        updateMetadata: false,
-      })
-    } catch (pdfLibErr) {
-      const msg = (pdfLibErr.message || '').toLowerCase()
+    // Step 2: Render every page to canvas, embed as image in new PDF
+    const newPdf = await PDFDocument.create()
 
-      // If PDF.js already confirmed wrong password, trust that
-      if (!passwordCorrect && isEncrypted) {
-        throw new Error('WRONG_PASSWORD')
-      }
+    const SCALE = 2.0
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
 
-      // pdf-lib sometimes can't handle certain encryption types even
-      // with correct password — try with ignoreEncryption as last resort
-      try {
-        pdfDoc = await PDFDocument.load(arrayBuffer, {
-          password: password,
-          ignoreEncryption: true,
-          throwOnInvalidObject: false,
-          updateMetadata: false,
-        })
-      } catch (fallbackErr) {
-        if (isEncrypted && !passwordCorrect) {
-          throw new Error('WRONG_PASSWORD')
-        }
-        throw new Error('UNSUPPORTED_ENCRYPTION')
-      }
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await pdfJsDoc.getPage(i)
+      const viewport = page.getViewport({ scale: SCALE })
+
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      await page.render({ canvasContext: ctx, viewport }).promise
+
+      const imgDataUrl = canvas.toDataURL('image/jpeg', 0.92)
+      const imgBase64 = imgDataUrl.split(',')[1]
+      const imgBytes = Uint8Array.from(atob(imgBase64), c => c.charCodeAt(0))
+
+      const jpgImage = await newPdf.embedJpg(imgBytes)
+
+      const w = viewport.width / SCALE
+      const h = viewport.height / SCALE
+      const newPage = newPdf.addPage([w, h])
+      newPage.drawImage(jpgImage, { x: 0, y: 0, width: w, height: h })
+
+      const pct = 35 + Math.round((i / totalPages) * 55)
+      setProgress(`Processing page ${i} of ${totalPages}…`, pct)
     }
 
-    setProgress('Removing encryption…', 75)
+    pdfJsDoc.destroy()
+    canvas.remove()
 
-    // Save without encryption — pdf-lib strips it on save() by default
-    let unlockedPdfBytes
-    try {
-      unlockedPdfBytes = await pdfDoc.save({
-        useObjectStreams: false, // better compatibility
-      })
-    } catch (saveErr) {
-      throw new Error('SAVE_FAILED')
-    }
+    setProgress('Saving unlocked PDF…', 92)
 
-    setProgress('Preparing download…', 95)
+    const unlockedPdfBytes = await newPdf.save()
     unlockedBytes = unlockedPdfBytes
 
     const blob = new Blob([unlockedBytes], { type: 'application/pdf' })
@@ -543,23 +495,19 @@ async function doUnlock() {
     downloadLink.download = outName
 
     setProgress('Done!', 100)
-    showStatus('success', '✅ PDF unlocked successfully! Click below to download.')
+    showStatus('success', `✅ Unlocked ${totalPages} page(s) successfully! Click below to download.`)
     showDownload()
 
   } catch (err) {
     hideProgress()
-    console.error('Unlock error:', err.message, err)
+    console.error('Unlock error:', err)
 
     if (err.message === 'WRONG_PASSWORD') {
       showStatus('error', '❌ Wrong password. Please check and try again.')
-    } else if (err.message === 'UNSUPPORTED_ENCRYPTION') {
-      showStatus('error', '⚠️ This PDF uses an encryption type that isn\'t supported. Try another tool for this file.')
-    } else if (err.message === 'SAVE_FAILED') {
-      showStatus('error', '⚠️ PDF was decrypted but couldn\'t be saved. The file may be corrupted.')
     } else if (err.message.includes('not encrypted') || err.message.includes('No password')) {
       showStatus('error', '📄 This PDF doesn\'t appear to be password-protected.')
     } else {
-      showStatus('error', `❌ Unexpected error: ${err.message}`)
+      showStatus('error', `❌ Error: ${err.message}`)
     }
   } finally {
     btn.disabled = false
