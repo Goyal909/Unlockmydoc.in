@@ -1,528 +1,324 @@
-import './style.css'
+import { PDFDocument } from 'https://cdn.skypack.dev/pdf-lib';
 
-// ===== LOAD EXTERNAL SCRIPTS =====
-function loadScript(src) {
-  if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = src
-    s.onload = resolve
-    s.onerror = () => reject(new Error(`Failed to load ${src}`))
-    document.head.appendChild(s)
-  })
+// ─── Router ───────────────────────────────────────────────
+function navigate(path) {
+  history.pushState({}, '', path);
+  render(path);
 }
 
-async function getPdfjsLib() {
-  if (window._pdfjsLib) return window._pdfjsLib
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-  window._pdfjsLib = window.pdfjsLib
-  return window._pdfjsLib
+window.addEventListener('popstate', () => render(location.pathname));
+
+function render(path) {
+  const app = document.getElementById('app');
+  switch (path) {
+    case '/about':      app.innerHTML = aboutPage();   break;
+    case '/privacy':    app.innerHTML = privacyPage(); break;
+    case '/contact':    app.innerHTML = contactPage(); break;
+    default:            app.innerHTML = homePage();    attachHomeListeners(); break;
+  }
+  // attach nav links on every render
+  document.querySelectorAll('[data-link]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      navigate(a.getAttribute('href'));
+    });
+  });
+  window.scrollTo(0, 0);
 }
 
-async function getJsPDF() {
-  if (window.jspdf) return window.jspdf.jsPDF
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-  return window.jspdf.jsPDF
+// ─── Nav (shared) ─────────────────────────────────────────
+function nav() {
+  return `
+  <nav style="display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,0.08);position:sticky;top:0;z-index:100;">
+    <a href="/" data-link style="font-family:Syne,sans-serif;font-weight:800;font-size:1.3rem;color:#2563eb;text-decoration:none;">🔓 UnlockMyDoc</a>
+    <div style="display:flex;gap:1.5rem;">
+      <a href="/" data-link style="color:#374151;text-decoration:none;font-family:DM Sans,sans-serif;">Home</a>
+      <a href="/about" data-link style="color:#374151;text-decoration:none;font-family:DM Sans,sans-serif;">About</a>
+      <a href="/privacy" data-link style="color:#374151;text-decoration:none;font-family:DM Sans,sans-serif;">Privacy</a>
+      <a href="/contact" data-link style="color:#374151;text-decoration:none;font-family:DM Sans,sans-serif;">Contact</a>
+    </div>
+  </nav>`;
 }
 
-// ===== ROUTER =====
-const routes = ['home', 'about', 'privacy', 'contact']
-
-function navigate(page) {
-  if (!routes.includes(page)) page = 'home'
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
-  document.querySelectorAll('.nav-links a').forEach(a => {
-    a.classList.toggle('active', a.dataset.page === page)
-  })
-  const el = document.getElementById(`page-${page}`)
-  if (el) el.classList.add('active')
-  window.scrollTo(0, 0)
-  history.pushState({}, '', page === 'home' ? '/' : `#${page}`)
+function footer() {
+  return `
+  <footer style="text-align:center;padding:2rem;background:#f9fafb;color:#6b7280;font-family:DM Sans,sans-serif;margin-top:3rem;font-size:0.9rem;">
+    <p>© ${new Date().getFullYear()} UnlockMyDoc. All rights reserved.</p>
+    <p style="margin-top:0.5rem;">
+      <a href="/privacy" data-link style="color:#2563eb;text-decoration:none;margin:0 0.5rem;">Privacy Policy</a> |
+      <a href="/about" data-link style="color:#2563eb;text-decoration:none;margin:0 0.5rem;">About</a> |
+      <a href="/contact" data-link style="color:#2563eb;text-decoration:none;margin:0 0.5rem;">Contact</a>
+    </p>
+  </footer>`;
 }
 
-function routeFromHash() {
-  const hash = location.hash.replace('#', '')
-  navigate(routes.includes(hash) ? hash : 'home')
-}
-
-window.navigate = navigate
-
-// ===== STATE =====
-let selectedFile = null
-
-// ===== RENDER APP =====
-function renderApp() {
-  document.getElementById('app').innerHTML = `
-    <nav>
-      <div class="nav-inner">
-        <a class="logo" onclick="navigate('home')">
-          <div class="logo-icon">
-            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 1.5C6.07 1.5 4.5 3.07 4.5 5v1H3.5A1 1 0 0 0 2.5 7v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V5C11.5 3.07 9.93 1.5 8 1.5zm0 1.5c1.1 0 2 .9 2 2v1H6V5c0-1.1.9-2 2-2zm0 6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" fill="#0a0a0f"/>
-            </svg>
-          </div>
-          UnlockMyDoc
-        </a>
-        <ul class="nav-links">
-          <li><a data-page="home" onclick="navigate('home')">Tool</a></li>
-          <li><a data-page="about" onclick="navigate('about')">About</a></li>
-          <li><a data-page="privacy" onclick="navigate('privacy')">Privacy</a></li>
-          <li><a data-page="contact" onclick="navigate('contact')">Contact</a></li>
-        </ul>
-      </div>
-    </nav>
-
-    <!-- PAGE: HOME -->
-    <div class="page active" id="page-home">
-      <div id="ad-top" class="ad-slot container">Advertisement</div>
-
-      <div class="hero container">
-        <div class="hero-badge">
-          <span class="dot"></span>
-          100% Free — No signup required
-        </div>
-        <h1>Unlock your PDF<br><span>in seconds</span></h1>
-        <p>Remove password protection from any PDF file — instantly, privately, free.</p>
-      </div>
-
-      <div class="privacy-banner container">
-        <span class="shield-icon">🛡️</span>
-        <div>
-          <strong>Your file never leaves your device</strong><br>
-          <span>All processing happens in your browser. Zero uploads.</span>
-        </div>
-      </div>
-
-      <div class="tool-card container">
-        <div class="drop-zone" id="drop-zone" onclick="triggerFileInput()">
-          <div class="drop-icon">📄</div>
-          <h3>Drop your PDF here</h3>
-          <p>or <span>click to browse</span> — max 50MB</p>
-        </div>
-        <input type="file" id="file-input" accept=".pdf,application/pdf" />
-
-        <div class="file-info" id="file-info">
-          <div class="file-icon">📑</div>
-          <div class="file-details">
-            <div class="file-name" id="file-name">document.pdf</div>
-            <div class="file-size" id="file-size">—</div>
-          </div>
-          <button class="remove-file" id="remove-file" title="Remove file">✕</button>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="pdf-password">PDF Password</label>
-          <div class="field-wrap">
-            <input type="password" id="pdf-password" placeholder="Enter the PDF password…" autocomplete="off" />
-            <button class="toggle-pw" id="toggle-pw" title="Show/hide password">👁</button>
-          </div>
-        </div>
-
-        <button class="btn-unlock" id="btn-unlock" disabled>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-          </svg>
-          Unlock PDF
-        </button>
-
-        <div class="progress-wrap" id="progress-wrap">
-          <div class="progress-label">
-            <span id="progress-text">Processing…</span>
-            <span id="progress-pct">0%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
-          </div>
-        </div>
-
-        <div class="status-msg" id="status-msg"></div>
-
-        <a class="btn-download" id="btn-download" href="#" download="unlocked.pdf">
-          ⬇ Download Unlocked PDF
-        </a>
-      </div>
-
-      <div id="ad-mid" class="ad-slot container">Advertisement</div>
-
-      <div class="how-section">
-        <h2 class="section-title">How it works</h2>
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
-            <h4>Upload PDF</h4>
-            <p>Select your password-protected PDF from your device. It stays local.</p>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <h4>Enter Password</h4>
-            <p>Type the current password. We use it only to decrypt your file in-browser.</p>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <h4>Download Free</h4>
-            <p>Get your unlocked PDF instantly — no watermarks, no limits.</p>
-          </div>
-        </div>
-      </div>
-
-      <div id="ad-bottom" class="ad-slot container">Advertisement</div>
+// ─── Home Page ────────────────────────────────────────────
+function homePage() {
+  return `
+  ${nav()}
+  <main style="max-width:680px;margin:3rem auto;padding:0 1rem;font-family:DM Sans,sans-serif;">
+    <div style="text-align:center;margin-bottom:2.5rem;">
+      <h1 style="font-family:Syne,sans-serif;font-size:2.5rem;font-weight:800;color:#1e293b;margin-bottom:1rem;">
+        Remove PDF Password Instantly
+      </h1>
+      <p style="font-size:1.1rem;color:#64748b;">100% free, works in your browser. Your file never leaves your device.</p>
     </div>
 
-    <!-- PAGE: ABOUT -->
-    <div class="page" id="page-about">
-      <div class="content-page">
-        <h1>About<br><span style="color:var(--accent)">UnlockMyDoc</span></h1>
-        <p class="subtitle">The world's most private PDF unlocker.</p>
+    <!-- Ad slot top -->
+    <div style="margin-bottom:1.5rem;text-align:center;">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5777531999104264" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    </div>
 
-        <p>UnlockMyDoc was built because PDF passwords are annoying — especially when you're the rightful owner of the file and just need to print, share, or edit it. We built a tool that solves that in under 10 seconds, with zero privacy compromise.</p>
+    <div id="drop-zone" style="border:2px dashed #93c5fd;border-radius:16px;padding:3rem 2rem;text-align:center;cursor:pointer;background:#eff6ff;transition:background 0.2s;">
+      <div style="font-size:3rem;margin-bottom:1rem;">📄</div>
+      <p style="font-size:1.1rem;color:#2563eb;font-weight:600;">Drag & drop your PDF here</p>
+      <p style="color:#64748b;margin:0.5rem 0;">or</p>
+      <label style="display:inline-block;background:#2563eb;color:#fff;padding:0.6rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;">
+        Browse File
+        <input type="file" id="file-input" accept=".pdf" style="display:none;" />
+      </label>
+      <p id="file-name" style="margin-top:1rem;color:#374151;font-size:0.95rem;"></p>
+    </div>
 
-        <p>Unlike other PDF tools that upload your files to a server, UnlockMyDoc processes everything directly in your browser. Your document never touches our servers — because we don't have any file-processing servers.</p>
+    <div id="password-section" style="display:none;margin-top:1.5rem;">
+      <label style="display:block;margin-bottom:0.5rem;font-weight:600;color:#374151;">PDF Password</label>
+      <div style="display:flex;gap:0.75rem;">
+        <input type="password" id="password-input" placeholder="Enter PDF password"
+          style="flex:1;padding:0.75rem 1rem;border:1.5px solid #cbd5e1;border-radius:8px;font-size:1rem;outline:none;" />
+        <button id="toggle-pw" style="padding:0.75rem 1rem;background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:8px;cursor:pointer;">👁</button>
+      </div>
+      <button id="unlock-btn" style="margin-top:1rem;width:100%;padding:0.85rem;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:1.1rem;font-weight:700;cursor:pointer;font-family:Syne,sans-serif;">
+        🔓 Unlock PDF
+      </button>
+    </div>
 
-        <div class="divider"></div>
-        <h2>Why choose UnlockMyDoc?</h2>
+    <div id="status-msg" style="margin-top:1rem;text-align:center;font-weight:600;font-size:1rem;"></div>
 
-        <div class="features-grid">
-          <div class="feature-item">
-            <div class="feature-icon">🔒</div>
-            <h4>100% Private</h4>
-            <p>Files are processed locally in your browser. Nothing is ever uploaded.</p>
-          </div>
-          <div class="feature-item">
-            <div class="feature-icon">⚡</div>
-            <h4>Lightning Fast</h4>
-            <p>No upload/download round-trip. Unlock happens instantly in your browser.</p>
-          </div>
-          <div class="feature-item">
-            <div class="feature-icon">🆓</div>
-            <h4>Completely Free</h4>
-            <p>No subscription, no sign-up, no limits. Just upload and unlock.</p>
-          </div>
-          <div class="feature-item">
-            <div class="feature-icon">📱</div>
-            <h4>Works Everywhere</h4>
-            <p>Desktop, tablet, mobile — any modern browser, any operating system.</p>
-          </div>
-        </div>
+    <!-- Ad slot bottom -->
+    <div style="margin-top:2rem;text-align:center;">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5777531999104264" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    </div>
 
-        <div class="divider"></div>
-        <h2>Technology</h2>
-        <p>UnlockMyDoc uses <strong>PDF.js</strong> (Mozilla's PDF engine) to decrypt and render your PDF page by page directly in the browser, then <strong>jsPDF</strong> assembles a brand new encryption-free PDF from those rendered pages. The output is a completely fresh PDF with zero encryption.</p>
-        <p>The domain <strong>unlockmydoc.in</strong> is operated independently and is not affiliated with any PDF software vendor.</p>
+    <div style="margin-top:3rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;text-align:center;">
+      <div style="background:#f0fdf4;padding:1.5rem;border-radius:12px;">
+        <div style="font-size:2rem;">🔒</div>
+        <h3 style="font-family:Syne,sans-serif;margin:0.5rem 0;color:#166534;">100% Private</h3>
+        <p style="color:#4b5563;font-size:0.9rem;">Files never leave your device</p>
+      </div>
+      <div style="background:#eff6ff;padding:1.5rem;border-radius:12px;">
+        <div style="font-size:2rem;">⚡</div>
+        <h3 style="font-family:Syne,sans-serif;margin:0.5rem 0;color:#1e40af;">Instant</h3>
+        <p style="color:#4b5563;font-size:0.9rem;">Unlock in seconds, no waiting</p>
+      </div>
+      <div style="background:#fdf4ff;padding:1.5rem;border-radius:12px;">
+        <div style="font-size:2rem;">💸</div>
+        <h3 style="font-family:Syne,sans-serif;margin:0.5rem 0;color:#6b21a8;">Free Forever</h3>
+        <p style="color:#4b5563;font-size:0.9rem;">No sign up, no payment</p>
       </div>
     </div>
 
-    <!-- PAGE: PRIVACY -->
-    <div class="page" id="page-privacy">
-      <div class="content-page">
-        <h1>Privacy<br><span style="color:var(--accent)">Policy</span></h1>
-        <p class="subtitle">Last updated: June 2025 &nbsp;·&nbsp; unlockmydoc.in</p>
-
-        <h2>Our Core Promise</h2>
-        <p><strong>Your files are never uploaded to any server.</strong> All PDF processing on UnlockMyDoc happens entirely within your web browser. When you select a PDF and enter a password, the decryption happens locally on your device. The resulting unlocked PDF is created locally and downloaded directly to your device.</p>
-        <p>We have no file-processing servers. We cannot access your documents. We never see your PDF content, filenames, or passwords.</p>
-
-        <div class="divider"></div>
-        <h2>Information We Collect</h2>
-        <ul>
-          <li><strong>Analytics</strong>: We use Google Analytics to track page views and usage patterns. Data is anonymized. No file content is tracked.</li>
-          <li><strong>Cookies</strong>: Google Analytics sets cookies to distinguish unique visitors.</li>
-          <li><strong>Advertising</strong>: We use Google AdSense. AdSense may use cookies for interest-based advertising. Opt out via <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google's Ad Settings</a>.</li>
-        </ul>
-
-        <h2>What We Do NOT Collect</h2>
-        <ul>
-          <li>Your PDF files or their contents</li>
-          <li>Passwords you enter into the tool</li>
-          <li>Your name, email, or any personal identifiers</li>
-        </ul>
-
-        <h2>Third-Party Services</h2>
-        <ul>
-          <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Analytics</a> — usage analytics</li>
-          <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google AdSense</a> — advertising</li>
-        </ul>
-
-        <h2>Changes to This Policy</h2>
-        <p>We may update this policy occasionally. Current version always at unlockmydoc.in. Questions? Email <a href="mailto:privacy@unlockmydoc.in">privacy@unlockmydoc.in</a>.</p>
-      </div>
+    <div style="margin-top:3rem;background:#f8fafc;border-radius:16px;padding:2rem;">
+      <h2 style="font-family:Syne,sans-serif;color:#1e293b;margin-top:0;">How It Works</h2>
+      <ol style="color:#475569;line-height:2;">
+        <li>Upload your password-protected PDF</li>
+        <li>Enter the PDF password</li>
+        <li>Click Unlock — your browser removes the protection</li>
+        <li>Download your unlocked PDF instantly</li>
+      </ol>
+      <p style="color:#64748b;font-size:0.9rem;">All processing happens locally in your browser using WebAssembly. Nothing is uploaded to any server.</p>
     </div>
-
-    <!-- PAGE: CONTACT -->
-    <div class="page" id="page-contact">
-      <div class="content-page">
-        <h1>Get in<br><span style="color:var(--accent)">Touch</span></h1>
-        <p class="subtitle">We'd love to hear from you.</p>
-
-        <div class="contact-cards">
-          <div class="contact-card">
-            <h3>💬 General Enquiries</h3>
-            <p>Questions, feedback, or partnership ideas.</p>
-            <a href="mailto:hello@unlockmydoc.in">hello@unlockmydoc.in</a>
-          </div>
-          <div class="contact-card">
-            <h3>🔒 Privacy & Data</h3>
-            <p>GDPR requests or privacy concerns.</p>
-            <a href="mailto:privacy@unlockmydoc.in">privacy@unlockmydoc.in</a>
-          </div>
-        </div>
-
-        <h2>Is my PDF safe?</h2>
-        <p>Yes. Your PDF is processed entirely in your browser. It never leaves your device.</p>
-
-        <h2>Do you store my password?</h2>
-        <p>Never. Passwords are used only in browser memory and discarded when you close the tab.</p>
-
-        <h2>Is this legal?</h2>
-        <p>UnlockMyDoc is intended for PDFs you have the legal right to access. Do not use this tool on documents you don't have authorization for.</p>
-
-        <div class="divider"></div>
-        <p>Response time is typically within 24–48 hours on business days.</p>
-      </div>
-    </div>
-
-    <footer>
-      <div class="footer-inner">
-        <div class="footer-nav">
-          <a onclick="navigate('home')">Tool</a>
-          <a onclick="navigate('about')">About</a>
-          <a onclick="navigate('privacy')">Privacy Policy</a>
-          <a onclick="navigate('contact')">Contact</a>
-        </div>
-        <p>© ${new Date().getFullYear()} <span>UnlockMyDoc</span> · unlockmydoc.in · All PDF processing is 100% client-side</p>
-      </div>
-    </footer>
-  `
-
-  bindEvents()
-  routeFromHash()
+  </main>
+  ${footer()}`;
 }
 
-// ===== BIND EVENTS =====
-function bindEvents() {
-  const dropZone = document.getElementById('drop-zone')
-  const fileInput = document.getElementById('file-input')
-  const removeBtn = document.getElementById('remove-file')
-  const passwordInput = document.getElementById('pdf-password')
-  const togglePw = document.getElementById('toggle-pw')
-  const unlockBtn = document.getElementById('btn-unlock')
+function attachHomeListeners() {
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const passwordSection = document.getElementById('password-section');
+  const passwordInput = document.getElementById('password-input');
+  const togglePw = document.getElementById('toggle-pw');
+  const unlockBtn = document.getElementById('unlock-btn');
+  const statusMsg = document.getElementById('status-msg');
+  const fileNameEl = document.getElementById('file-name');
+  let pdfFile = null;
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover') })
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'))
+  function handleFile(file) {
+    if (!file || file.type !== 'application/pdf') {
+      statusMsg.textContent = '❌ Please select a valid PDF file.';
+      statusMsg.style.color = '#dc2626';
+      return;
+    }
+    pdfFile = file;
+    fileNameEl.textContent = `Selected: ${file.name}`;
+    passwordSection.style.display = 'block';
+    statusMsg.textContent = '';
+  }
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.style.background = '#dbeafe';
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.style.background = '#eff6ff';
+  });
   dropZone.addEventListener('drop', e => {
-    e.preventDefault()
-    dropZone.classList.remove('dragover')
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0])
-  })
-
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) handleFile(fileInput.files[0])
-  })
-
-  removeBtn.addEventListener('click', e => { e.stopPropagation(); clearFile() })
+    e.preventDefault();
+    dropZone.style.background = '#eff6ff';
+    handleFile(e.dataTransfer.files[0]);
+  });
 
   togglePw.addEventListener('click', () => {
-    const inp = document.getElementById('pdf-password')
-    inp.type = inp.type === 'password' ? 'text' : 'password'
-    togglePw.textContent = inp.type === 'password' ? '👁' : '🙈'
-  })
+    passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+  });
 
-  passwordInput.addEventListener('input', updateUnlockBtn)
-  unlockBtn.addEventListener('click', doUnlock)
-}
+  unlockBtn.addEventListener('click', async () => {
+    if (!pdfFile) {
+      statusMsg.textContent = '❌ Please select a PDF file first.';
+      statusMsg.style.color = '#dc2626';
+      return;
+    }
+    const password = passwordInput.value;
+    if (!password) {
+      statusMsg.textContent = '❌ Please enter the PDF password.';
+      statusMsg.style.color = '#dc2626';
+      return;
+    }
 
-function triggerFileInput() { document.getElementById('file-input').click() }
-window.triggerFileInput = triggerFileInput
+    unlockBtn.textContent = '⏳ Unlocking...';
+    unlockBtn.disabled = true;
+    statusMsg.textContent = '';
 
-function handleFile(file) {
-  if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-    showStatus('error', '⚠️ Please select a PDF file.'); return
-  }
-  if (file.size > 52428800) {
-    showStatus('error', '⚠️ File too large. Maximum size is 50MB.'); return
-  }
-  selectedFile = file
-  hideDownload(); clearStatus()
-  document.getElementById('file-info').classList.add('visible')
-  document.getElementById('file-name').textContent = file.name
-  document.getElementById('file-size').textContent = formatSize(file.size)
-  updateUnlockBtn()
-}
-
-function clearFile() {
-  selectedFile = null
-  document.getElementById('file-info').classList.remove('visible')
-  document.getElementById('file-input').value = ''
-  updateUnlockBtn(); clearStatus(); hideDownload(); hideProgress()
-}
-
-function updateUnlockBtn() {
-  const pw = document.getElementById('pdf-password').value
-  document.getElementById('btn-unlock').disabled = !selectedFile || !pw.trim()
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1048576).toFixed(1) + ' MB'
-}
-
-// ===== CORE UNLOCK LOGIC =====
-async function doUnlock() {
-  if (!selectedFile) return
-  const password = document.getElementById('pdf-password').value
-  if (!password) return
-
-  const btn = document.getElementById('btn-unlock')
-  btn.disabled = true
-  btn.innerHTML = `<div class="spinner"></div> Unlocking…`
-  clearStatus(); hideDownload(); showProgress('Reading file…', 10)
-
-  try {
-    const arrayBuffer = await readFileAsArrayBuffer(selectedFile)
-    setProgress('Loading libraries…', 15)
-
-    // Load PDF.js and jsPDF in parallel
-    const [pdfjsLib, jsPDF] = await Promise.all([getPdfjsLib(), getJsPDF()])
-    setProgress('Verifying password…', 25)
-
-    // Step 1: Open with PDF.js — authoritative password check + decryption
-    let pdfDoc
     try {
-      pdfDoc = await pdfjsLib.getDocument({
-        data: new Uint8Array(arrayBuffer),
-        password: password,
-      }).promise
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer, { password });
+      const unlockedBytes = await pdfDoc.save();
+      const blob = new Blob([unlockedBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pdfFile.name.replace('.pdf', '_unlocked.pdf');
+      a.click();
+      URL.revokeObjectURL(url);
+      statusMsg.textContent = '✅ PDF unlocked and downloaded!';
+      statusMsg.style.color = '#16a34a';
     } catch (err) {
-      if (err.name === 'PasswordException' || err.code === 1 || err.code === 2) {
-        throw new Error('WRONG_PASSWORD')
-      }
-      throw err
+      statusMsg.textContent = '❌ Wrong password or PDF is not password-protected.';
+      statusMsg.style.color = '#dc2626';
     }
 
-    const totalPages = pdfDoc.numPages
-    setProgress(`Processing page 1 of ${totalPages}…`, 30)
-
-    // Step 2: Get first page size for jsPDF init
-    const firstPage = await pdfDoc.getPage(1)
-    const firstVp = firstPage.getViewport({ scale: 1.0 })
-    const pageW = firstVp.width
-    const pageH = firstVp.height
-
-    // Step 3: Init jsPDF — this PDF has NO encryption by design
-    const pdf = new jsPDF({
-      orientation: pageW > pageH ? 'l' : 'p',
-      unit: 'pt',
-      format: [pageW, pageH],
-      compress: true,
-    })
-
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    const SCALE = 2.0
-
-    // Step 4: Render each page and add to new PDF
-    for (let i = 1; i <= totalPages; i++) {
-      const page = await pdfDoc.getPage(i)
-
-      // Get this page's dimensions (pages can vary in size)
-      const vp1 = page.getViewport({ scale: 1.0 })
-      const vp2 = page.getViewport({ scale: SCALE })
-
-      canvas.width = Math.floor(vp2.width)
-      canvas.height = Math.floor(vp2.height)
-
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      await page.render({ canvasContext: ctx, viewport: vp2 }).promise
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95)
-
-      if (i === 1) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, vp1.width, vp1.height, '', 'FAST')
-      } else {
-        pdf.addPage([vp1.width, vp1.height])
-        pdf.addImage(imgData, 'JPEG', 0, 0, vp1.width, vp1.height, '', 'FAST')
-      }
-
-      const pct = 30 + Math.round((i / totalPages) * 62)
-      setProgress(`Processing page ${i} of ${totalPages}…`, pct)
-    }
-
-    pdfDoc.destroy()
-    canvas.remove()
-
-    setProgress('Saving…', 95)
-
-    // jsPDF output is always a fresh unencrypted PDF
-    const outBuffer = pdf.output('arraybuffer')
-    const blob = new Blob([outBuffer], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-
-    const dl = document.getElementById('btn-download')
-    dl.href = url
-    dl.download = selectedFile.name.replace(/\.pdf$/i, '') + '_unlocked.pdf'
-
-    setProgress('Done!', 100)
-    showStatus('success', `✅ Unlocked ${totalPages} page(s)! Click below to download.`)
-    showDownload()
-
-  } catch (err) {
-    hideProgress()
-    console.error('Unlock error:', err)
-    if (err.message === 'WRONG_PASSWORD' || (err.message || '').toLowerCase().includes('password')) {
-      showStatus('error', '❌ Wrong password. Please check and try again.')
-    } else {
-      showStatus('error', `❌ Error: ${err.message}`)
-    }
-  } finally {
-    btn.disabled = false
-    btn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-      </svg>
-      Unlock PDF`
-    updateUnlockBtn()
-  }
+    unlockBtn.textContent = '🔓 Unlock PDF';
+    unlockBtn.disabled = false;
+  });
 }
 
-function readFileAsArrayBuffer(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = e => resolve(e.target.result)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsArrayBuffer(file)
-  })
+// ─── About Page ───────────────────────────────────────────
+function aboutPage() {
+  return `
+  ${nav()}
+  <main style="max-width:760px;margin:3rem auto;padding:0 1.5rem;font-family:DM Sans,sans-serif;color:#374151;line-height:1.8;">
+    <h1 style="font-family:Syne,sans-serif;font-size:2.2rem;color:#1e293b;">About UnlockMyDoc</h1>
+    <p>UnlockMyDoc is a free, browser-based tool that lets you remove password protection from PDF files instantly — without uploading your file to any server.</p>
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">Our Mission</h2>
+    <p>We believe your documents are private. Most online PDF unlockers require you to upload your files to their servers, which poses a serious privacy risk. UnlockMyDoc works entirely in your browser using WebAssembly — your PDF never leaves your device.</p>
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">How It Works</h2>
+    <p>UnlockMyDoc uses <strong>pdf-lib</strong>, a powerful open-source JavaScript library, to process your PDF entirely within your browser. When you provide the correct password, the tool removes the encryption and lets you download the unlocked version.</p>
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">Who Is This For?</h2>
+    <ul>
+      <li>People who forgot the password to their own PDF</li>
+      <li>Professionals working with password-protected documents they own</li>
+      <li>Anyone who values privacy and doesn't want to upload sensitive files online</li>
+    </ul>
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">Technology</h2>
+    <p>Built with Vite, vanilla JavaScript, and pdf-lib. Deployed on Railway. Fast, lightweight, and private by design.</p>
+    <div style="margin-top:2rem;padding:1.5rem;background:#eff6ff;border-radius:12px;">
+      <p style="margin:0;color:#1e40af;font-weight:600;">📧 Questions? Reach us at <a href="mailto:hello@unlockmydoc.in" style="color:#2563eb;">hello@unlockmydoc.in</a></p>
+    </div>
+  </main>
+  ${footer()}`;
 }
 
-// ===== UI HELPERS =====
-function showProgress(text, pct) {
-  document.getElementById('progress-wrap').classList.add('visible')
-  document.getElementById('progress-text').textContent = text
-  document.getElementById('progress-pct').textContent = pct + '%'
-  document.getElementById('progress-fill').style.width = pct + '%'
-}
-function setProgress(text, pct) { showProgress(text, pct) }
-function hideProgress() { document.getElementById('progress-wrap').classList.remove('visible') }
+// ─── Privacy Page ─────────────────────────────────────────
+function privacyPage() {
+  return `
+  ${nav()}
+  <main style="max-width:760px;margin:3rem auto;padding:0 1.5rem;font-family:DM Sans,sans-serif;color:#374151;line-height:1.8;">
+    <h1 style="font-family:Syne,sans-serif;font-size:2.2rem;color:#1e293b;">Privacy Policy</h1>
+    <p style="color:#6b7280;font-size:0.9rem;">Last updated: April 2026</p>
 
-function showStatus(type, msg) {
-  const el = document.getElementById('status-msg')
-  el.className = `status-msg ${type} visible`
-  el.textContent = msg
-}
-function clearStatus() {
-  const el = document.getElementById('status-msg')
-  el.className = 'status-msg'
-  el.textContent = ''
-}
-function showDownload() { document.getElementById('btn-download').classList.add('visible') }
-function hideDownload() { document.getElementById('btn-download').classList.remove('visible') }
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">1. No File Uploads</h2>
+    <p>UnlockMyDoc processes all PDF files entirely within your browser. <strong>Your files are never uploaded to our servers.</strong> All processing happens locally on your device using WebAssembly technology. We have no access to your files, their contents, or your passwords.</p>
 
-window.addEventListener('popstate', routeFromHash)
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">2. Information We Collect</h2>
+    <p>We do not collect any personally identifiable information. We may collect anonymous usage data such as:</p>
+    <ul>
+      <li>Pages visited on our website</li>
+      <li>Browser type and device type (via Google Analytics)</li>
+      <li>Approximate geographic location (country/city level)</li>
+    </ul>
+    <p>This data is used solely to improve our service and is never sold to third parties.</p>
 
-// ===== INIT =====
-renderApp()
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">3. Google Analytics</h2>
+    <p>We use Google Analytics to understand how visitors use our website. Google Analytics uses cookies to collect anonymous traffic data. You can opt out by installing the <a href="https://tools.google.com/dlpage/gaoptout" style="color:#2563eb;">Google Analytics Opt-out Browser Add-on</a>.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">4. Google AdSense</h2>
+    <p>We use Google AdSense to display advertisements. Google may use cookies to serve ads based on your prior visits to our website or other websites. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" style="color:#2563eb;">Google Ads Settings</a>.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">5. Cookies</h2>
+    <p>Our website uses cookies only for analytics and advertising purposes (Google Analytics and Google AdSense). We do not use cookies to track personal information.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">6. Data Security</h2>
+    <p>Since your files never leave your browser, there is no risk of your document data being intercepted or stored by us. We take reasonable precautions to protect any non-file data we handle.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">7. Children's Privacy</h2>
+    <p>Our service is not directed to children under 13. We do not knowingly collect information from children.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">8. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated date.</p>
+
+    <h2 style="font-family:Syne,sans-serif;color:#1e293b;">9. Contact Us</h2>
+    <p>If you have any questions about this Privacy Policy, contact us at: <a href="mailto:privacy@unlockmydoc.in" style="color:#2563eb;">privacy@unlockmydoc.in</a></p>
+  </main>
+  ${footer()}`;
+}
+
+// ─── Contact Page ─────────────────────────────────────────
+function contactPage() {
+  return `
+  ${nav()}
+  <main style="max-width:600px;margin:3rem auto;padding:0 1.5rem;font-family:DM Sans,sans-serif;color:#374151;line-height:1.8;">
+    <h1 style="font-family:Syne,sans-serif;font-size:2.2rem;color:#1e293b;">Contact Us</h1>
+    <p>Have a question, suggestion, or issue? We'd love to hear from you.</p>
+
+    <div style="background:#f8fafc;border-radius:16px;padding:2rem;margin-top:1.5rem;">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+        <span style="font-size:1.5rem;">📧</span>
+        <div>
+          <p style="margin:0;font-weight:600;color:#1e293b;">General Enquiries</p>
+          <a href="mailto:hello@unlockmydoc.in" style="color:#2563eb;text-decoration:none;">hello@unlockmydoc.in</a>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <span style="font-size:1.5rem;">🔒</span>
+        <div>
+          <p style="margin:0;font-weight:600;color:#1e293b;">Privacy Concerns</p>
+          <a href="mailto:privacy@unlockmydoc.in" style="color:#2563eb;text-decoration:none;">privacy@unlockmydoc.in</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:2rem;background:#eff6ff;border-radius:12px;padding:1.5rem;">
+      <h3 style="font-family:Syne,sans-serif;color:#1e40af;margin-top:0;">Common Questions</h3>
+      <p><strong>My PDF won't unlock?</strong><br>Make sure you're entering the correct password. UnlockMyDoc can only remove password protection when you know the password — it cannot crack unknown passwords.</p>
+      <p style="margin-bottom:0;"><strong>Is my file safe?</strong><br>Yes. Your file never leaves your browser. We cannot see or access your documents.</p>
+    </div>
+  </main>
+  ${footer()}`;
+}
+
+// ─── Start ────────────────────────────────────────────────
+render(location.pathname);
