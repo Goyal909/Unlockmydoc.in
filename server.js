@@ -1,34 +1,29 @@
-const express = require('express')
-const path = require('path')
-const fs = require('fs')
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const app = express()
-const PORT = process.env.PORT || 3000
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Serve static files from dist folder
-app.use(express.static(path.join(__dirname, 'dist')))
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// SPA fallback - serve HTML files directly, otherwise send index.html
+// Serve static files from dist
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Real crawlable routes for SEO & AdSense
+const routes = ['/', '/about', '/privacy', '/contact'];
+routes.forEach(route => {
+  app.get(route, (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  });
+});
+
+// Catch-all fallback
 app.get('*', (req, res) => {
-  const filePath = path.join(__dirname, 'dist', req.path)
-
-  // If the path points to an actual HTML file, serve it directly
-  if (req.path.endsWith('.html')) {
-    return res.sendFile(filePath, err => {
-      if (err) res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-    })
-  }
-
-  // Check if path without extension is an HTML file (clean URLs)
-  const htmlPath = filePath + '.html'
-  if (fs.existsSync(htmlPath)) {
-    return res.sendFile(htmlPath)
-  }
-
-  // Default SPA fallback
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-})
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 app.listen(PORT, () => {
-  console.log(`UnlockMyDoc running on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});
