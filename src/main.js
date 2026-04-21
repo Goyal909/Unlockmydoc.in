@@ -47,7 +47,10 @@ function navHTML(activePage = '') {
         </div>
         UnlockMyDoc
       </a>
-      <ul class="nav-links">
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links">
         ${links.map(l => `
           <li><a href="${l.href}" data-link class="${activePage === l.href ? 'active' : ''}">${l.label}</a></li>
         `).join('')}
@@ -93,13 +96,11 @@ function homePage() {
       </div>
     </div>
 
-    <div id="ad-top" class="ad-slot container">Advertisement</div>
-
     <div class="tool-card container">
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon">📄</div>
         <h3>Drop your PDF here</h3>
-        <p>or <span>browse to upload</span></p>
+        <p>or <span>tap to upload</span></p>
         <input type="file" id="file-input" accept=".pdf" />
       </div>
 
@@ -115,8 +116,8 @@ function homePage() {
       <div class="field-group" id="password-section" style="display:none;">
         <label class="field-label">PDF Password</label>
         <div class="field-wrap">
-          <input type="password" id="password-input" placeholder="Enter the PDF password…" />
-          <button class="toggle-pw" id="toggle-pw">👁</button>
+          <input type="password" id="password-input" placeholder="Enter the PDF password…" autocomplete="current-password" inputmode="text" />
+          <button class="toggle-pw" id="toggle-pw" aria-label="Show/hide password">👁</button>
         </div>
       </div>
 
@@ -140,15 +141,13 @@ function homePage() {
       </button>
     </div>
 
-    <div id="ad-mid" class="ad-slot container">Advertisement</div>
-
     <div class="how-section">
       <h2 class="section-title">How It Works</h2>
       <div class="steps">
         <div class="step">
           <div class="step-num">1</div>
           <h4>Upload PDF</h4>
-          <p>Drag & drop or browse to select your password-protected PDF file.</p>
+          <p>Drag & drop or tap to select your password-protected PDF file.</p>
         </div>
         <div class="step">
           <div class="step-num">2</div>
@@ -162,8 +161,6 @@ function homePage() {
         </div>
       </div>
     </div>
-
-    <div id="ad-bottom" class="ad-slot container">Advertisement</div>
   </div>
 
   ${footerHTML()}`;
@@ -186,6 +183,15 @@ function attachHomeListeners() {
   const progressFill = document.getElementById('progress-fill');
   const progressPct = document.getElementById('progress-pct');
   const progressText = document.getElementById('progress-text');
+
+  // Mobile nav toggle
+  const navToggle = document.getElementById('nav-toggle');
+  const navLinks = document.getElementById('nav-links');
+  navToggle?.addEventListener('click', () => {
+    navLinks.classList.toggle('open');
+    navToggle.classList.toggle('open');
+  });
+
   let pdfFile = null;
 
   function formatSize(bytes) {
@@ -197,6 +203,8 @@ function attachHomeListeners() {
   function setStatus(type, msg) {
     statusMsg.className = `status-msg visible ${type}`;
     statusMsg.textContent = msg;
+    // Scroll status into view on mobile
+    statusMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function clearStatus() {
@@ -216,6 +224,8 @@ function attachHomeListeners() {
     passwordSection.style.display = 'block';
     btnDownload.classList.remove('visible');
     clearStatus();
+    // Auto-focus password input on mobile after file select
+    setTimeout(() => passwordInput.focus(), 300);
   }
 
   dropZone.addEventListener('click', () => fileInput.click());
@@ -277,6 +287,7 @@ function attachHomeListeners() {
       btnDownload.classList.add('visible');
 
       setStatus('success', '✅ PDF unlocked successfully! Click the button above to download.');
+      btnDownload.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch {
       setStatus('error', '❌ Wrong password or the PDF is not password-protected.');
       progressWrap.classList.remove('visible');
