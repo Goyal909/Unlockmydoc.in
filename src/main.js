@@ -1,4 +1,5 @@
 import { PDFDocument } from 'https://cdn.skypack.dev/pdf-lib';
+import './style.css';
 
 // ─── Router ───────────────────────────────────────────────
 function navigate(path) {
